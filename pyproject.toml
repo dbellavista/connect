@@ -1,0 +1,11 @@
+[project]
+name = "music"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "invoke>=2.2.1",
+    "questionary>=2.1.1",
+    "ytmusicapi==1.11.5",
+]
