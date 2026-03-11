@@ -45,3 +45,6 @@ headers.txt
 # OS
 .DS_Store
 Thumbs.db
+.rmapi*
+node_modules/
+data/

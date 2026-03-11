@@ -3,7 +3,10 @@ import json
 import os
 import sys
 
-AUTH_FILE = 'browser.json'
+DATA_DIR = os.environ.get('DATA_DIR', os.path.join(os.getcwd(), 'data'))
+os.makedirs(DATA_DIR, exist_ok=True)
+
+AUTH_FILE = os.path.join(DATA_DIR, 'browser.json')
 
 def get_ytmusic():
     from ytmusicapi import YTMusic
@@ -18,7 +21,7 @@ def get_ytmusic():
 def auth(c):
     """Authenticate with YouTube Music using browser headers and save to browser.json"""
     import json
-    headers_file = 'headers.txt'
+    headers_file = os.path.join(DATA_DIR, 'headers.txt')
     
     if os.path.exists(headers_file):
         print(f"Found {headers_file}. Reading headers...")
@@ -59,8 +62,8 @@ def list_playlists(c):
         pid = p.get('playlistId')
         print(f" - {title} (ID: {pid})")
 
-@task(help={'playlist_id': 'The ID of the YouTube Music playlist to check for duplicates'})
-def deduplicate_playlist(c, playlist_id):
+@task(help={'playlist_id': 'The ID of the YouTube Music playlist to check for duplicates', 'auto': 'Automatically remove without prompting'})
+def deduplicate_playlist(c, playlist_id, auto=False):
     """Find duplicates inside a specific playlist and prompt for removal"""
     yt = get_ytmusic()
     import questionary
@@ -104,19 +107,22 @@ def deduplicate_playlist(c, playlist_id):
 
     print(f"\nFound {len(duplicates)} duplicate tracks.")
     
-    choices = [
-        questionary.Choice(title=t["name"], value=t["value"])
-        for t in duplicates
-    ]
-    
-    to_remove_tracks = questionary.checkbox(
-        "Select duplicate tracks to REMOVE (Space to toggle, 'a' to select all, Enter to confirm/skip all):",
-        choices=choices
-    ).ask()
-    
-    if to_remove_tracks is None:
-        print("Operation aborted.")
-        return
+    if auto:
+        to_remove_tracks = [t["value"] for t in duplicates]
+    else:
+        choices = [
+            questionary.Choice(title=t["name"], value=t["value"])
+            for t in duplicates
+        ]
+        
+        to_remove_tracks = questionary.checkbox(
+            "Select duplicate tracks to REMOVE (Space to toggle, 'a' to select all, Enter to confirm/skip all):",
+            choices=choices
+        ).ask()
+        
+        if to_remove_tracks is None:
+            print("Operation aborted.")
+            return
         
     to_remove = []
     for track in to_remove_tracks:
@@ -164,10 +170,11 @@ def deduplicate_all(c):
 @task(
     help={
         'primary': 'The ID of the primary playlist',
-        'secondary': 'Comma-separated list of secondary playlist IDs'
+        'secondary': 'Comma-separated list of secondary playlist IDs',
+        'auto': 'Automatically add missing tracks to primary and remove from secondary without prompting'
     }
 )
-def sync_playlists(c, primary, secondary):
+def sync_playlists(c, primary, secondary, auto=False):
     """Find songs in secondary playlists that are not in the primary playlist and prompt for action"""
     yt = get_ytmusic()
     import questionary
@@ -221,39 +228,42 @@ def sync_playlists(c, primary, secondary):
             
         print(f"Found {len(not_in_primary)} tracks not in primary playlist.")
         
-        # 1. Prompt for ADD to primary
-        add_choices = [
-            questionary.Choice(title=t["name"], value=t["value"])
-            for t in not_in_primary
-        ]
-        
-        to_add_tracks = questionary.checkbox(
-            "Select tracks to ADD to primary playlist (Space to toggle, 'a' to select all, Enter to confirm/skip all):",
-            choices=add_choices
-        ).ask()
-        
-        if to_add_tracks is None:  # User cancelled (Ctrl-C)
-            print("Operation aborted.")
-            return
+        if auto:
+            to_add_tracks = [t["value"] for t in not_in_primary]
+            to_remove_tracks = [t["value"] for t in not_in_primary]
+        else:
+            # 1. Prompt for ADD to primary
+            add_choices = [
+                questionary.Choice(title=t["name"], value=t["value"])
+                for t in not_in_primary
+            ]
             
+            to_add_tracks = questionary.checkbox(
+                "Select tracks to ADD to primary playlist (Space to toggle, 'a' to select all, Enter to confirm/skip all):",
+                choices=add_choices
+            ).ask()
+            
+            if to_add_tracks is None:  # User cancelled (Ctrl-C)
+                print("Operation aborted.")
+                return
+                
+            # 2. Prompt for REMOVE from secondary
+            remove_choices = []
+            for t in not_in_primary:
+                # We can still offer to remove it even if it was added to primary,
+                # so we show all of them.
+                remove_choices.append(questionary.Choice(title=t["name"], value=t["value"]))
+                
+            to_remove_tracks = questionary.checkbox(
+                "Select tracks to REMOVE from secondary playlist (Space to toggle, 'a' to select all, Enter to confirm/skip all):",
+                choices=remove_choices
+            ).ask()
+            
+            if to_remove_tracks is None: # User cancelled
+                print("Operation aborted.")
+                return
+                
         to_add_vids = [t.get('videoId') for t in to_add_tracks]
-        
-        # 2. Prompt for REMOVE from secondary
-        remove_choices = []
-        for t in not_in_primary:
-            # We can still offer to remove it even if it was added to primary,
-            # so we show all of them.
-            remove_choices.append(questionary.Choice(title=t["name"], value=t["value"]))
-            
-        to_remove_tracks = questionary.checkbox(
-            "Select tracks to REMOVE from secondary playlist (Space to toggle, 'a' to select all, Enter to confirm/skip all):",
-            choices=remove_choices
-        ).ask()
-        
-        if to_remove_tracks is None: # User cancelled
-            print("Operation aborted.")
-            return
-            
         to_remove = []
         for track in to_remove_tracks:
             vid = track.get('videoId')
@@ -283,10 +293,11 @@ def sync_playlists(c, primary, secondary):
 @task(
     help={
         'primary': 'The ID of the primary playlist',
-        'secondary': 'Comma-separated list of secondary playlist IDs'
+        'secondary': 'Comma-separated list of secondary playlist IDs',
+        'auto': 'Automatically distribute to secondary playlists without prompting'
     }
 )
-def distribute_primary(c, primary, secondary):
+def distribute_primary(c, primary, secondary, auto=False):
     """Find songs in primary that are missing from secondary playlists and prompt to add them"""
     yt = get_ytmusic()
     import questionary
@@ -339,20 +350,23 @@ def distribute_primary(c, primary, secondary):
             
         print(f"Found {len(missing_in_sec)} tracks from primary missing in '{sec_title}'.")
         
-        add_choices = [
-            questionary.Choice(title=t["name"], value=t["value"])
-            for t in missing_in_sec
-        ]
-        
-        to_add_tracks = questionary.checkbox(
-            f"Select tracks from primary to ADD to '{sec_title}' (Space to toggle, 'a' to select all, Enter to confirm/skip all):",
-            choices=add_choices
-        ).ask()
-        
-        if to_add_tracks is None:
-            print("Operation aborted.")
-            return
+        if auto:
+            to_add_tracks = [t["value"] for t in missing_in_sec]
+        else:
+            add_choices = [
+                questionary.Choice(title=t["name"], value=t["value"])
+                for t in missing_in_sec
+            ]
             
+            to_add_tracks = questionary.checkbox(
+                f"Select tracks from primary to ADD to '{sec_title}' (Space to toggle, 'a' to select all, Enter to confirm/skip all):",
+                choices=add_choices
+            ).ask()
+            
+            if to_add_tracks is None:
+                print("Operation aborted.")
+                return
+                
         to_add_vids = [t.get('videoId') for t in to_add_tracks]
         
         if to_add_vids:
@@ -362,3 +376,118 @@ def distribute_primary(c, primary, secondary):
                 print("Successfully added tracks.")
             except Exception as e:
                 print(f"Error adding tracks: {e}")
+
+# --- MCP JSON Tasks ---
+
+@task
+def mcp_get_duplicates(c, playlist_id):
+    """Return JSON list of duplicate tracks in a playlist"""
+    yt = get_ytmusic()
+    try:
+        playlist = yt.get_playlist(playlist_id, limit=None)
+    except Exception as e:
+        print(json.dumps({"error": str(e)}))
+        return
+
+    seen_video_ids = set()
+    duplicates = []
+    for track in playlist.get('tracks', []):
+        vid = track.get('videoId')
+        if not vid: continue
+        if vid in seen_video_ids:
+            duplicates.append(track)
+        else:
+            seen_video_ids.add(vid)
+    print(json.dumps(duplicates))
+
+@task(help={'playlist_id': '', 'tracks_json': 'JSON string of track objects'})
+def mcp_remove_duplicates(c, playlist_id, tracks_json):
+    """Remove specific duplicate tracks using JSON input"""
+    yt = get_ytmusic()
+    try:
+        tracks = json.loads(tracks_json)
+        to_remove = [{'videoId': t.get('videoId'), 'setVideoId': t.get('setVideoId')} 
+                     for t in tracks if t.get('videoId') and t.get('setVideoId')]
+        if to_remove:
+            yt.remove_playlist_items(playlist_id, to_remove)
+            print(json.dumps({"success": True, "removed": len(to_remove)}))
+        else:
+            print(json.dumps({"success": False, "error": "No valid tracks with setVideoId provided"}))
+    except Exception as e:
+        print(json.dumps({"error": str(e)}))
+
+@task
+def mcp_get_sync_candidates(c, primary, secondary):
+    """Return JSON list of tracks in secondary but not in primary"""
+    yt = get_ytmusic()
+    try:
+        primary_playlist = yt.get_playlist(primary, limit=None)
+        sec_playlist = yt.get_playlist(secondary, limit=None)
+    except Exception as e:
+        print(json.dumps({"error": str(e)}))
+        return
+
+    primary_vids = set(t.get('videoId') for t in primary_playlist.get('tracks', []) if t.get('videoId'))
+    not_in_primary = [t for t in sec_playlist.get('tracks', []) if t.get('videoId') and t.get('videoId') not in primary_vids]
+    print(json.dumps(not_in_primary))
+
+@task(help={'primary': '', 'tracks_json': 'JSON string of track objects'})
+def mcp_sync_add(c, primary, tracks_json):
+    """Add tracks to primary playlist using JSON input"""
+    yt = get_ytmusic()
+    try:
+        tracks = json.loads(tracks_json)
+        vids = [t.get('videoId') for t in tracks if t.get('videoId')]
+        if vids:
+            yt.add_playlist_items(primary, vids)
+            print(json.dumps({"success": True, "added": len(vids)}))
+        else:
+            print(json.dumps({"success": False, "error": "No valid tracks provided"}))
+    except Exception as e:
+        print(json.dumps({"error": str(e)}))
+
+@task(help={'secondary': '', 'tracks_json': 'JSON string of track objects'})
+def mcp_sync_remove(c, secondary, tracks_json):
+    """Remove tracks from secondary playlist using JSON input"""
+    yt = get_ytmusic()
+    try:
+        tracks = json.loads(tracks_json)
+        to_remove = [{'videoId': t.get('videoId'), 'setVideoId': t.get('setVideoId')} 
+                     for t in tracks if t.get('videoId') and t.get('setVideoId')]
+        if to_remove:
+            yt.remove_playlist_items(secondary, to_remove)
+            print(json.dumps({"success": True, "removed": len(to_remove)}))
+        else:
+            print(json.dumps({"success": False, "error": "No valid tracks with setVideoId provided"}))
+    except Exception as e:
+        print(json.dumps({"error": str(e)}))
+
+@task
+def mcp_get_distribute_candidates(c, primary, secondary):
+    """Return JSON list of tracks in primary but not in secondary"""
+    yt = get_ytmusic()
+    try:
+        primary_playlist = yt.get_playlist(primary, limit=None)
+        sec_playlist = yt.get_playlist(secondary, limit=None)
+    except Exception as e:
+        print(json.dumps({"error": str(e)}))
+        return
+
+    sec_vids = set(t.get('videoId') for t in sec_playlist.get('tracks', []) if t.get('videoId'))
+    not_in_sec = [t for t in primary_playlist.get('tracks', []) if t.get('videoId') and t.get('videoId') not in sec_vids]
+    print(json.dumps(not_in_sec))
+
+@task(help={'secondary': '', 'tracks_json': 'JSON string of track objects'})
+def mcp_distribute_add(c, secondary, tracks_json):
+    """Add tracks to secondary playlist using JSON input"""
+    yt = get_ytmusic()
+    try:
+        tracks = json.loads(tracks_json)
+        vids = [t.get('videoId') for t in tracks if t.get('videoId')]
+        if vids:
+            yt.add_playlist_items(secondary, vids)
+            print(json.dumps({"success": True, "added": len(vids)}))
+        else:
+            print(json.dumps({"success": False, "error": "No valid tracks provided"}))
+    except Exception as e:
+        print(json.dumps({"error": str(e)}))
