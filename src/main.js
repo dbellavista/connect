@@ -212,6 +212,25 @@ program
   });
 
 program
+  .command('mkdir')
+  .description('Create a new directory')
+  .argument('<name>', 'The name of the new directory')
+  .argument('[directory]', 'The destination directory (e.g. /Notes)', '/')
+  .action(async (name, directory) => {
+    try {
+      const api = await getApi();
+      const parentId = await resolveDirectory(api, directory);
+      logger.info(`Creating directory ${name} in ${directory}...`);
+      await api.putFolder(name, { parent: parentId });
+      logger.info('Directory created successfully.');
+      await saveCache(api);
+    } catch (err) {
+      logger.error({ err }, `Failed to create directory: ${err.message}`);
+      process.exit(1);
+    }
+  });
+
+program
   .command('upload')
   .description('Upload a PDF or EPUB file to a specific directory')
   .argument('<file>', 'Path to local file (.pdf or .epub)')

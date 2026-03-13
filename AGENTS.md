@@ -36,6 +36,7 @@ The MCP server exposes the documentation for the MCP skills directly as resource
 - `skill://remarkable`: Returns the markdown contents of `mcp-skills/remarkable/README.md`.
 - `skill://ytmusic`: Returns the markdown contents of `mcp-skills/ytmusic/README.md`.
 - `skill://utility`: Returns the markdown contents of `mcp-skills/utility/README.md`.
+- `skill://corriere`: Returns the markdown contents of `mcp-skills/corriere/README.md`.
 
 Alternatively, you can read the files directly here:
 
@@ -52,6 +53,10 @@ Alternatively, you can read the files directly here:
 - [Utility Skills](mcp-skills/utility/README.md)
   - `util_reflow_pdf`: Reflows a PDF to be more readable on a tablet.
   - `util_markdown_to_pdf`: Converts a Markdown file to PDF.
+- [Corriere della Sera Skills](mcp-skills/corriere/README.md)
+  - `corriere_get_categories`: List news categories (in Italian).
+  - `corriere_get_news`: Fetch and filter news (in Italian).
+  - `corriere_read_article`: Scrape full article content (in Italian).
 
 ## Agent Guidelines
 

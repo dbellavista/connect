@@ -1,4 +1,5 @@
 import json
+from connect.utils.logger import logger
 
 from invoke.context import Context
 from invoke.tasks import task
@@ -20,6 +21,7 @@ def reflow_pdf(
     import pymupdf
 
     try:
+        logger.info(f"Opening PDF: {input_pdf}")
         doc = pymupdf.open(input_pdf)
         html_content = (
             "<html><body style='font-family: helvetica, sans-serif; line-height: 1.5;'>"
@@ -41,6 +43,7 @@ def reflow_pdf(
         doc.close()
 
         # Use Story for automatic text layout
+        logger.info("Layouting text with pymupdf.Story")
         story = pymupdf.Story(html=html_content)
         writer = pymupdf.DocumentWriter(output_pdf)
 
@@ -57,8 +60,10 @@ def reflow_pdf(
             writer.end_page()
 
         writer.close()
+        logger.info(f"Successfully generated {output_pdf}")
         print(json.dumps({"success": True, "output": output_pdf}))
     except Exception as e:
+        logger.error(f"Failed to reflow PDF: {e}")
         print(json.dumps({"success": False, "error": str(e)}))
 
 
@@ -76,11 +81,13 @@ def mcp_bulk_reflow(c: Context, inputs_json: str, font_size: int = 16) -> None:
 
     import pymupdf
 
+    logger.info(f"Bulk reflowing {len(inputs)} PDFs")
     for item in inputs:
         input_pdf = item["input_pdf"]
         output_pdf = item["output_pdf"]
 
         try:
+            logger.info(f"Processing {input_pdf}")
             doc = pymupdf.open(input_pdf)
             html_content = (
                 "<html><body style='font-family: helvetica, sans-serif; line-height: 1.5;'>"
@@ -113,6 +120,7 @@ def mcp_bulk_reflow(c: Context, inputs_json: str, font_size: int = 16) -> None:
             writer.close()
             results.append({"input": input_pdf, "success": True, "output": output_pdf})
         except Exception as e:
+            logger.error(f"Failed to process {input_pdf}: {e}")
             results.append({"input": input_pdf, "success": False, "error": str(e)})
 
     print(json.dumps(results))
@@ -133,6 +141,7 @@ def markdown_to_pdf(
     import pymupdf
 
     try:
+        logger.info(f"Converting markdown {input_md} to PDF")
         with open(input_md, "r", encoding="utf-8") as f:
             md_text = f.read()
 
@@ -159,8 +168,10 @@ def markdown_to_pdf(
             writer.end_page()
 
         writer.close()
+        logger.info(f"Successfully generated {output_pdf}")
         print(json.dumps({"success": True, "output": output_pdf}))
     except Exception as e:
+        logger.error(f"Failed to convert markdown to PDF: {e}")
         print(json.dumps({"success": False, "error": str(e)}))
 
 
@@ -177,10 +188,12 @@ def mcp_bulk_markdown_to_pdf(c: Context, inputs_json: str, font_size: int = 16) 
     import markdown  # type: ignore
     import pymupdf
 
+    logger.info(f"Bulk converting {len(inputs)} Markdown files")
     for item in inputs:
         input_md = item["input_md"]
         output_pdf = item["output_pdf"]
         try:
+            logger.info(f"Processing {input_md}")
             with open(input_md, "r", encoding="utf-8") as f:
                 md_text = f.read()
 
@@ -207,6 +220,7 @@ def mcp_bulk_markdown_to_pdf(c: Context, inputs_json: str, font_size: int = 16) 
             writer.close()
             results.append({"input": input_md, "success": True, "output": output_pdf})
         except Exception as e:
+            logger.error(f"Failed to process {input_md}: {e}")
             results.append({"input": input_md, "success": False, "error": str(e)})
 
     print(json.dumps(results))

@@ -1,6 +1,7 @@
 import { Command } from 'commander';
 import { fetchRssFeed, scrapeArticle } from './fetcher.js';
 import { logger } from '../../src/utils/logger.js';
+import { CATEGORIES } from './categories.js';
 
 const program = new Command();
 
@@ -10,31 +11,63 @@ program
   .command('categories')
   .description('List available news categories and their RSS URLs')
   .action(() => {
-    // Hardcoded list from https://www.corriere.it/rss/
-    const categories = [
-      { name: 'Homepage', url: 'https://xml2.corriereobjects.it/rss/homepage.xml' },
-      { name: 'Politica', url: 'https://xml2.corriereobjects.it/rss/politica.xml' },
-      { name: 'Esteri', url: 'https://xml2.corriereobjects.it/rss/esteri.xml' },
-      { name: 'Cronache', url: 'https://xml2.corriereobjects.it/rss/cronache.xml' },
-      { name: 'Economia', url: 'https://xml2.corriereobjects.it/rss/economia.xml' },
-      { name: 'Sport', url: 'https://xml2.corriereobjects.it/rss/sport.xml' },
-      { name: 'Spettacoli', url: 'https://xml2.corriereobjects.it/rss/spettacoli.xml' },
-      { name: 'Cultura', url: 'https://xml2.corriereobjects.it/rss/cultura.xml' },
-      { name: 'Scienze', url: 'https://xml2.corriereobjects.it/rss/scienze.xml' },
-      { name: 'Tecnologia', url: 'https://xml2.corriereobjects.it/rss/tecnologia.xml' },
-      { name: 'Salute', url: 'https://xml2.corriereobjects.it/rss/salute.xml' },
-    ];
-    logger.info(categories);
+    logger.info(CATEGORIES);
   });
 
 program
   .command('news')
-  .description('Get latest news for a specific RSS URL')
-  .argument('<url>', 'The RSS feed URL')
-  .action(async (url) => {
+  .description('Get latest news for specific categories or URLs')
+  .argument('[inputs...]', 'RSS URLs or Category Names (e.g. "Notizie: Homepage")')
+  .option('--gte <date>', 'Filter articles newer than or equal to this date (ISO string)')
+  .option('--lte <date>', 'Filter articles older than or equal to this date (ISO string)')
+  .action(async (inputs, options) => {
     try {
-      const news = await fetchRssFeed(url);
-      logger.info(news);
+      if (!inputs || inputs.length === 0) {
+        // Default to Homepage if no input provided
+        inputs = ['Notizie: Homepage'];
+      }
+
+      // Resolve URLs from categories or use directly
+      const urls = inputs.map(input => {
+        const cat = CATEGORIES.find(c => c.name === input);
+        return cat ? cat.url : input;
+      });
+
+      // Fetch all feeds in parallel, skipping those that fail
+      const feedResults = await Promise.allSettled(urls.map(url => fetchRssFeed(url)));
+      
+      const merged = [];
+      const seen = new Set();
+      
+      feedResults.forEach((result, index) => {
+        if (result.status === 'fulfilled') {
+          for (const item of result.value) {
+            const id = item.guid || item.link;
+            if (!seen.has(id)) {
+              merged.push(item);
+              seen.add(id);
+            }
+          }
+        } else {
+          logger.warn(`Failed to fetch feed ${urls[index]}: ${result.reason.message}`);
+        }
+      });
+
+      // Filter by date
+      let filtered = merged;
+      if (options.gte) {
+        const gteDate = new Date(options.gte);
+        filtered = filtered.filter(item => new Date(item.pubDate) >= gteDate);
+      }
+      if (options.lte) {
+        const lteDate = new Date(options.lte);
+        filtered = filtered.filter(item => new Date(item.pubDate) <= lteDate);
+      }
+
+      // Sort by date descending
+      filtered.sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
+
+      logger.info(filtered);
     } catch (err) {
       logger.error({ err }, err.message);
       process.exit(1);

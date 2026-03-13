@@ -45,6 +45,14 @@ All input files should be placed inside the `data/` directory of the project, an
   - `hash`: The hash of the entry to rename.
   - `new_name`: The new visible name.
 
+### Create Directory
+
+- **Description**: Create a new directory on reMarkable.
+- **MCP Tool**: `remarkable_create_directory`
+- **Parameters**:
+  - `name`: The name of the new directory.
+  - `directory`: The parent directory path (e.g. '/' or '/Notes').
+
 ### Upload File
 
 - **Description**: Uploads a local PDF or EPUB file to a specific directory on the reMarkable tablet. (If uploading a research paper, consider using `util_reflow_pdf` first).

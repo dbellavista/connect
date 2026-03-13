@@ -49,5 +49,8 @@ describe('MCP Server Integration', () => {
 
     const remarkableBulkUpload = response.tools.find(t => t.name === 'remarkable_bulk_upload');
     expect(remarkableBulkUpload).toBeDefined();
+
+    const remarkableCreateDirectory = response.tools.find(t => t.name === 'remarkable_create_directory');
+    expect(remarkableCreateDirectory).toBeDefined();
   });
 });

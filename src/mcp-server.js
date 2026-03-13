@@ -119,6 +119,12 @@ server.setRequestHandler(ListResourcesRequestSchema, async () => {
         description: 'Documentation and workflows for utility skills (PDF reflowing, Markdown conversion)',
         mimeType: 'text/markdown',
       },
+      {
+        uri: 'skill://corriere',
+        name: 'Corriere della Sera Skills Documentation',
+        description: 'Documentation and workflows for Corriere della Sera skills',
+        mimeType: 'text/markdown',
+      },
     ],
   };
 });
@@ -133,6 +139,8 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
     filePath = path.join(process.cwd(), 'mcp-skills/ytmusic/README.md');
   } else if (uri === 'skill://utility') {
     filePath = path.join(process.cwd(), 'mcp-skills/utility/README.md');
+  } else if (uri === 'skill://corriere') {
+    filePath = path.join(process.cwd(), 'mcp-skills/corriere/README.md');
   } else {
     throw new Error(`Unknown resource URI: ${uri}`);
   }
@@ -252,6 +260,25 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             },
           },
           required: ['hash', 'new_name'],
+        },
+      },
+      {
+        name: 'remarkable_create_directory',
+        description: 'Create a new directory on reMarkable.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            name: {
+              type: 'string',
+              description: 'The name of the new directory',
+            },
+            directory: {
+              type: 'string',
+              description: "The parent directory path (e.g. '/' or '/Notes')",
+              default: '/',
+            },
+          },
+          required: ['name'],
         },
       },
       {
@@ -558,7 +585,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: 'corriere_get_categories',
-        description: 'List available news categories and their RSS URLs from Corriere della Sera.',
+        description: 'List available news categories and their RSS URLs from Corriere della Sera. Note: Category names and content are in Italian.',
         inputSchema: {
           type: 'object',
           properties: {},
@@ -566,18 +593,31 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: 'corriere_get_news',
-        description: 'Get the latest news articles for a specific Corriere della Sera RSS URL.',
+        description:
+          'Get the latest news articles from Corriere della Sera. You can filter by multiple categories and by date. Note: Titles and snippets are in Italian.',
         inputSchema: {
           type: 'object',
           properties: {
-            url: { type: 'string', description: 'The RSS feed URL' },
+            categories: {
+              type: 'array',
+              items: { type: 'string' },
+              description:
+                'List of category names (e.g. ["Notizie: Homepage", "Locale: Milano"]) or custom RSS URLs. If omitted, defaults to homepage.',
+            },
+            gte: {
+              type: 'string',
+              description: 'Filter articles newer than or equal to this date (ISO string, e.g. "2024-03-12T00:00:00Z")',
+            },
+            lte: {
+              type: 'string',
+              description: 'Filter articles older than or equal to this date (ISO string)',
+            },
           },
-          required: ['url'],
         },
       },
       {
         name: 'corriere_read_article',
-        description: 'Read the full text of a Corriere della Sera article, bypassing paywall via existing cookies.',
+        description: 'Read the full text of a Corriere della Sera article, bypassing paywall via existing cookies. Note: Article content is in Italian.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -694,6 +734,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             },
           ],
         };
+      }
+      case 'remarkable_create_directory': {
+        const name = request.params.arguments?.name;
+        const dir = request.params.arguments?.directory || '/';
+        if (!name) throw new Error("Missing 'name' argument.");
+        return await runCommand(`node src/main.js mkdir "${name}" "${dir}"`);
       }
       case 'remarkable_bulk_update': {
         const updates = request.params.arguments?.updates;
@@ -857,8 +903,18 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         return await runCommand(`node mcp-skills/corriere/cli.js categories`);
       }
       case 'corriere_get_news': {
-        const url = request.params.arguments?.url;
-        return await runCommand(`node mcp-skills/corriere/cli.js news "${url}"`);
+        const categories = request.params.arguments?.categories || [];
+        const gte = request.params.arguments?.gte;
+        const lte = request.params.arguments?.lte;
+
+        let cmd = `node mcp-skills/corriere/cli.js news`;
+        if (categories.length > 0) {
+          cmd += ` ${categories.map((c) => `"${c}"`).join(' ')}`;
+        }
+        if (gte) cmd += ` --gte "${gte}"`;
+        if (lte) cmd += ` --lte "${lte}"`;
+
+        return await runCommand(cmd);
       }
       case 'corriere_read_article': {
         const url = request.params.arguments?.url;
