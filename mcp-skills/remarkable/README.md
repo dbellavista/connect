@@ -2,6 +2,10 @@
 
 This directory contains skills related to managing documents on a reMarkable tablet.
 
+**⚠️ IMPORTANT DOCKER PATH WARNING:**
+Because the MCP server runs inside a Docker container, any tools that require local file paths (e.g., input files or output destinations) MUST reference the mounted volume `/app/data/`. Do not use arbitrary absolute paths from the host machine (e.g., `/Users/name/...`).
+All input files should be placed inside the `data/` directory of the project, and the tool should be given paths like `/app/data/my_file.pdf`.
+
 ## Available Skills
 
 ### List Files (Human Readable)
@@ -41,26 +45,14 @@ This directory contains skills related to managing documents on a reMarkable tab
   - `hash`: The hash of the entry to rename.
   - `new_name`: The new visible name.
 
-### Reflow PDF
-
-- **Description**: Reflow a two-column scientific PDF into a single column with a larger font size. Highly recommended before uploading a research paper to the reMarkable tablet for improved readability on a smaller device.
-- **MCP Tool**: `remarkable_reflow_pdf`
-- **Parameters**: `input_pdf` (original PDF), `output_pdf` (destination PDF), and `font_size` (optional, default 16).
-
-### Convert Markdown to PDF
-
-- **Description**: Convert a Markdown file into a PDF with a larger font size. Helpful for reading Markdown notes on the reMarkable tablet.
-- **MCP Tool**: `remarkable_markdown_to_pdf`
-- **Parameters**: `input_md` (original Markdown file), `output_pdf` (destination PDF), and `font_size` (optional, default 16).
-
 ### Upload File
 
-- **Description**: Uploads a local PDF or EPUB file to a specific directory on the reMarkable tablet. (If uploading a research paper, consider using `remarkable_reflow_pdf` first).
+- **Description**: Uploads a local PDF or EPUB file to a specific directory on the reMarkable tablet. (If uploading a research paper, consider using `util_reflow_pdf` first).
 - **MCP Tool**: `remarkable_upload`
-- **Parameters**: `file_path` (local file) and `directory` (destination path path on the tablet).
+- **Parameters**: `file_path` (local file, MUST be inside `/app/data/`) and `directory` (destination path on the tablet).
 
 ### Bulk Upload Files
 
 - **Description**: Uploads multiple local PDF or EPUB files to a specific directory on the reMarkable tablet.
 - **MCP Tool**: `remarkable_bulk_upload`
-- **Parameters**: `files` (array of local file paths) and `directory` (destination path on the tablet).
+- **Parameters**: `files` (array of local file paths, MUST be inside `/app/data/`) and `directory` (destination path on the tablet).

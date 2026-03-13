@@ -35,6 +35,7 @@ The MCP server exposes the documentation for the MCP skills directly as resource
 
 - `skill://remarkable`: Returns the markdown contents of `mcp-skills/remarkable/README.md`.
 - `skill://ytmusic`: Returns the markdown contents of `mcp-skills/ytmusic/README.md`.
+- `skill://utility`: Returns the markdown contents of `mcp-skills/utility/README.md`.
 
 Alternatively, you can read the files directly here:
 
@@ -48,7 +49,12 @@ Alternatively, you can read the files directly here:
   - `ytmusic_list_playlists`: View your playlists and IDs.
   - Granular deduplication and sync tools (see `ytmusic_get_duplicates`, `ytmusic_get_sync_candidates`, etc.).
   - Automatic tools like `ytmusic_deduplicate_playlist_auto` to blindly perform operations.
+- [Utility Skills](mcp-skills/utility/README.md)
+  - `util_reflow_pdf`: Reflows a PDF to be more readable on a tablet.
+  - `util_markdown_to_pdf`: Converts a Markdown file to PDF.
 
 ## Agent Guidelines
 
 When interacting with the `connect` MCP server, agents should refer to the guidelines defined in the `connect-mcp` skill located at `development-skills/connect-mcp/SKILL.md`.
+
+**Docker Path Warning**: When using tools that accept or return local file paths (such as `remarkable_upload` or `util_reflow_pdf`), you MUST bear in mind that the MCP server runs inside a Docker container. Do not use absolute paths from your host machine (e.g. `/Users/name/...`). Instead, always use paths mapped to the container's mounted volume, such as `/app/data/my_file.pdf`, ensuring the file actually exists within the `data/` directory.

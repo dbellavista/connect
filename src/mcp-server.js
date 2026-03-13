@@ -113,6 +113,12 @@ server.setRequestHandler(ListResourcesRequestSchema, async () => {
         description: 'Documentation and workflows for YouTube Music skills',
         mimeType: 'text/markdown',
       },
+      {
+        uri: 'skill://utility',
+        name: 'Utility Skills Documentation',
+        description: 'Documentation and workflows for utility skills (PDF reflowing, Markdown conversion)',
+        mimeType: 'text/markdown',
+      },
     ],
   };
 });
@@ -125,6 +131,8 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
     filePath = path.join(process.cwd(), 'mcp-skills/remarkable/README.md');
   } else if (uri === 'skill://ytmusic') {
     filePath = path.join(process.cwd(), 'mcp-skills/ytmusic/README.md');
+  } else if (uri === 'skill://utility') {
+    filePath = path.join(process.cwd(), 'mcp-skills/utility/README.md');
   } else {
     throw new Error(`Unknown resource URI: ${uri}`);
   }
@@ -272,14 +280,14 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         },
       },
       {
-        name: 'remarkable_reflow_pdf',
+        name: 'util_reflow_pdf',
         description:
           'Reflow a two-column scientific PDF into a single column with larger font for better readability on devices like reMarkable.',
         inputSchema: {
           type: 'object',
           properties: {
-            input_pdf: { type: 'string', description: 'Path to the input PDF file' },
-            output_pdf: { type: 'string', description: 'Path to the output reflowed PDF' },
+            input_pdf: { type: 'string', description: 'Path to the input PDF file (MUST be within the /app/data/ volume)' },
+            output_pdf: { type: 'string', description: 'Path to the output reflowed PDF (MUST be within the /app/data/ volume)' },
             font_size: {
               type: 'number',
               description: 'Font size for the reflowed text',
@@ -290,14 +298,14 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         },
       },
       {
-        name: 'remarkable_markdown_to_pdf',
+        name: 'util_markdown_to_pdf',
         description:
           'Convert a Markdown file into a PDF with increased font size for better readability on devices like reMarkable.',
         inputSchema: {
           type: 'object',
           properties: {
-            input_md: { type: 'string', description: 'Path to the input Markdown file' },
-            output_pdf: { type: 'string', description: 'Path to the output PDF file' },
+            input_md: { type: 'string', description: 'Path to the input Markdown file (MUST be within the /app/data/ volume)' },
+            output_pdf: { type: 'string', description: 'Path to the output PDF file (MUST be within the /app/data/ volume)' },
             font_size: {
               type: 'number',
               description: 'Font size for the text',
@@ -315,7 +323,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           properties: {
             file_path: {
               type: 'string',
-              description: 'Local path to the PDF or EPUB file',
+              description: 'Local path to the PDF or EPUB file (MUST be within the /app/data/ volume)',
             },
             directory: {
               type: 'string',
@@ -334,7 +342,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             files: {
               type: 'array',
               items: { type: 'string' },
-              description: 'Local paths to the PDF or EPUB files',
+              description: 'Local paths to the PDF or EPUB files (MUST be within the /app/data/ volume)',
             },
             directory: {
               type: 'string',
@@ -681,7 +689,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           ],
         };
       }
-      case 'remarkable_reflow_pdf': {
+      case 'util_reflow_pdf': {
         const input = request.params.arguments?.input_pdf;
         const output = request.params.arguments?.output_pdf;
         const fontSize = request.params.arguments?.font_size || 16;
@@ -689,7 +697,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           `uv run invoke pdf.reflow-pdf --input-pdf "${input}" --output-pdf "${output}" --font-size ${fontSize}`
         );
       }
-      case 'remarkable_markdown_to_pdf': {
+      case 'util_markdown_to_pdf': {
         const inputMd = request.params.arguments?.input_md;
         const outputPdf = request.params.arguments?.output_pdf;
         const fontSize = request.params.arguments?.font_size || 16;
