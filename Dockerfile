@@ -1,10 +1,11 @@
 # Use an official Python runtime as a parent image
 FROM python:3.12-slim
+ENV PYTHONPATH="/app"
 
-# Install system dependencies including Node.js (v20)
+# Install system dependencies including Node.js (v24)
 RUN apt-get update && \
     apt-get install -y curl && \
-    curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    curl -fsSL https://deb.nodesource.com/setup_24.x | bash - && \
     apt-get install -y nodejs && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
@@ -28,7 +29,10 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync
 
 # Copy the rest of the application code
-COPY . .
+COPY connect connect
+COPY src src
+COPY tasks tasks
+COPY mcp-skills mcp-skills
 
 # IMPORTANT: To use the MCP server properly, you will need to mount the authentication files
 # and cache directory at runtime. For example:
