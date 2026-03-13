@@ -30,3 +30,10 @@ line-length = 120
 
 [tool.ruff.lint]
 select = ["E", "F", "I"]
+
+[tool.uv]
+package = true
+
+[tool.setuptools]
+py-modules = ["connect", "tests"]
+

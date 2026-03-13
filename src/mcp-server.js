@@ -316,6 +316,58 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         },
       },
       {
+        name: 'util_bulk_reflow_pdf',
+        description: 'Bulk reflow multiple PDF files.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            inputs: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  input_pdf: { type: 'string', description: 'Path to the input PDF file (MUST be within the /app/data/ volume)' },
+                  output_pdf: { type: 'string', description: 'Path to the output reflowed PDF (MUST be within the /app/data/ volume)' },
+                },
+                required: ['input_pdf', 'output_pdf'],
+              },
+            },
+            font_size: {
+              type: 'number',
+              description: 'Font size for the reflowed text',
+              default: 16,
+            },
+          },
+          required: ['inputs'],
+        },
+      },
+      {
+        name: 'util_bulk_markdown_to_pdf',
+        description: 'Bulk convert multiple Markdown files to PDF.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            inputs: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  input_md: { type: 'string', description: 'Path to the input Markdown file (MUST be within the /app/data/ volume)' },
+                  output_pdf: { type: 'string', description: 'Path to the output PDF file (MUST be within the /app/data/ volume)' },
+                },
+                required: ['input_md', 'output_pdf'],
+              },
+            },
+            font_size: {
+              type: 'number',
+              description: 'Font size for the text',
+              default: 16,
+            },
+          },
+          required: ['inputs'],
+        },
+      },
+      {
         name: 'remarkable_upload',
         description: 'Upload a PDF or EPUB file to the reMarkable tablet',
         inputSchema: {
@@ -703,6 +755,22 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const fontSize = request.params.arguments?.font_size || 16;
         return await runCommand(
           `uv run invoke pdf.markdown-to-pdf --input-md "${inputMd}" --output-pdf "${outputPdf}" --font-size ${fontSize}`
+        );
+      }
+      case 'util_bulk_reflow_pdf': {
+        const inputs = request.params.arguments?.inputs || [];
+        const fontSize = request.params.arguments?.font_size || 16;
+        const jsonStr = JSON.stringify(inputs);
+        return await runCommand(
+          `uv run invoke pdf.mcp-bulk-reflow --inputs-json '${jsonStr.replace(/'/g, "'\\''")}' --font-size ${fontSize}`
+        );
+      }
+      case 'util_bulk_markdown_to_pdf': {
+        const inputs = request.params.arguments?.inputs || [];
+        const fontSize = request.params.arguments?.font_size || 16;
+        const jsonStr = JSON.stringify(inputs);
+        return await runCommand(
+          `uv run invoke pdf.mcp-bulk-markdown-to-pdf --inputs-json '${jsonStr.replace(/'/g, "'\\''")}' --font-size ${fontSize}`
         );
       }
       case 'remarkable_upload': {
