@@ -244,4 +244,45 @@ program
     }
   });
 
+program
+  .command('bulk-upload')
+  .description('Bulk upload PDF or EPUB files to a specific directory')
+  .argument('<directory>', 'Destination directory on reMarkable')
+  .argument('<files...>', 'Paths to local files (.pdf or .epub)')
+  .action(async (directory, files) => {
+    try {
+      const api = await getApi();
+      const parentId = await resolveDirectory(api, directory);
+
+      let successCount = 0;
+      for (const file of files) {
+        try {
+          const fileBuffer = await fs.readFile(file);
+          const ext = path.extname(file).toLowerCase();
+          const visibleName = path.basename(file, ext);
+
+          logger.info(`Uploading ${file} to ${directory}...`);
+          if (ext === '.pdf') {
+            await api.putPdf(visibleName, fileBuffer, { parent: parentId });
+          } else if (ext === '.epub') {
+            await api.putEpub(visibleName, fileBuffer, { parent: parentId });
+          } else {
+            throw new Error(`Unsupported file type for ${file}. Only .pdf and .epub are supported.`);
+          }
+          successCount++;
+        } catch (err) {
+          logger.error({ err }, `Failed to upload file ${file}: ${err.message}`);
+        }
+      }
+
+      logger.info(`Bulk upload complete! Successfully uploaded ${successCount}/${files.length} files.`);
+      await saveCache(api);
+    } catch (err) {
+      logger.error({ err }, `Failed bulk upload: ${err.message}`);
+      if (err.cause) logger.error({ cause: err.cause }, 'Cause');
+      logger.error({ stack: err.stack }, 'Stack trace');
+      process.exit(1);
+    }
+  });
+
 program.parse();

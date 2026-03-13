@@ -46,5 +46,8 @@ describe('MCP Server Integration', () => {
     // Ensure the tools are the ones we expect
     const remarkableList = response.tools.find(t => t.name === 'remarkable_list');
     expect(remarkableList).toBeDefined();
+
+    const remarkableBulkUpload = response.tools.find(t => t.name === 'remarkable_bulk_upload');
+    expect(remarkableBulkUpload).toBeDefined();
   });
 });

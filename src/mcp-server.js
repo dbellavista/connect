@@ -326,6 +326,25 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         },
       },
       {
+        name: 'remarkable_bulk_upload',
+        description: 'Upload multiple PDF or EPUB files to the reMarkable tablet',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            files: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Local paths to the PDF or EPUB files',
+            },
+            directory: {
+              type: 'string',
+              description: "Destination directory on reMarkable (e.g. '/Books')",
+            },
+          },
+          required: ['files', 'directory'],
+        },
+      },
+      {
         name: 'ytmusic_list_playlists',
         description: 'List all YouTube Music playlists and their IDs',
         inputSchema: {
@@ -682,6 +701,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const file = request.params.arguments?.file_path;
         const dir = request.params.arguments?.directory;
         return await runCommand(`node src/main.js upload "${file}" "${dir}"`);
+      }
+      case 'remarkable_bulk_upload': {
+        const files = request.params.arguments?.files || [];
+        const dir = request.params.arguments?.directory;
+        if (files.length === 0) {
+           return { content: [{ type: 'text', text: 'No files provided for upload.' }] };
+        }
+        const filesArgs = files.map(f => `"${f}"`).join(' ');
+        return await runCommand(`node src/main.js bulk-upload "${dir}" ${filesArgs}`);
       }
       case 'ytmusic_list_playlists': {
         return await runCommand(`uv run invoke youtube.list-playlists`);

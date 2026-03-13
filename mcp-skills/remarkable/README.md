@@ -58,3 +58,9 @@ This directory contains skills related to managing documents on a reMarkable tab
 - **Description**: Uploads a local PDF or EPUB file to a specific directory on the reMarkable tablet. (If uploading a research paper, consider using `remarkable_reflow_pdf` first).
 - **MCP Tool**: `remarkable_upload`
 - **Parameters**: `file_path` (local file) and `directory` (destination path path on the tablet).
+
+### Bulk Upload Files
+
+- **Description**: Uploads multiple local PDF or EPUB files to a specific directory on the reMarkable tablet.
+- **MCP Tool**: `remarkable_bulk_upload`
+- **Parameters**: `files` (array of local file paths) and `directory` (destination path on the tablet).
