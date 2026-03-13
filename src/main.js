@@ -1,9 +1,10 @@
 import https from 'https';
 import nodeFetch from 'node-fetch';
+import { logger } from './utils/logger.js';
 
 // Limit concurrent connections to avoid ETIMEDOUT / fetch failed with many files
 const agent = new https.Agent({ maxSockets: 5, keepAlive: true });
-global.fetch = function(url, options = {}) {
+global.fetch = function (url, options = {}) {
   options.agent = agent;
   return nodeFetch(url, options);
 };
@@ -24,7 +25,7 @@ async function getToken() {
   try {
     return await fs.readFile(TOKEN_FILE, 'utf8');
   } catch (err) {
-    throw new Error('Not authenticated. Please run "auth <code>" first.');
+    throw new Error('Not authenticated. Please run "auth <code>" first.', { cause: err });
   }
 }
 
@@ -33,7 +34,7 @@ async function getApi() {
   let cacheData = undefined;
   try {
     cacheData = await fs.readFile(CACHE_FILE, 'utf8');
-  } catch (err) {
+  } catch {
     // Ignore cache read errors (e.g., file not found)
   }
   return await remarkable(token, { cache: cacheData });
@@ -44,7 +45,7 @@ async function saveCache(api) {
     const cacheStr = api.dumpCache();
     await fs.writeFile(CACHE_FILE, cacheStr, 'utf8');
   } catch (err) {
-    console.error('Warning: Failed to save cache:', err.message);
+    logger.error({ err }, `Warning: Failed to save cache: ${err.message}`);
   }
 }
 
@@ -55,45 +56,46 @@ async function resolveDirectory(api, targetPath) {
   }
 
   const items = await api.listItems();
-  const parts = targetPath.split('/').filter(p => p.trim() !== '');
-  
+  const parts = targetPath.split('/').filter((p) => p.trim() !== '');
+
   let currentParentId = ''; // Start at root
   for (const part of parts) {
     const folder = items.find(
-      item => item.visibleName === part && 
-              item.type === 'CollectionType' && 
-              (item.parent || '') === currentParentId
+      (item) =>
+        item.visibleName === part &&
+        item.type === 'CollectionType' &&
+        (item.parent || '') === currentParentId
     );
-    
+
     if (!folder) {
       throw new Error(`Directory not found: ${part} in path ${targetPath}`);
     }
     currentParentId = folder.id;
   }
-  
+
   return currentParentId;
 }
 
 const program = new Command();
 
-program
-  .name('rmapi-cli')
-  .description('CLI to interact with reMarkable via rmapi-js');
+program.name('rmapi-cli').description('CLI to interact with reMarkable via rmapi-js');
 
 program
   .command('auth')
-  .description('Authenticate device with an 8-letter code from https://my.remarkable.com/device/desktop/connect')
+  .description(
+    'Authenticate device with an 8-letter code from https://my.remarkable.com/device/desktop/connect'
+  )
   .argument('<code>', '8-letter authentication code')
   .action(async (code) => {
     try {
-      console.log('Authenticating...');
+      logger.info('Authenticating...');
       const token = await register(code);
       await fs.writeFile(TOKEN_FILE, token, 'utf8');
-      console.log('Authentication successful. Token saved.');
+      logger.info('Authentication successful. Token saved.');
     } catch (err) {
-      console.error('Authentication failed:', err.message);
-      if (err.cause) console.error('Cause:', err.cause);
-      console.error('Stack trace:', err.stack);
+      logger.error({ err }, `Authentication failed: ${err.message}`);
+      if (err.cause) logger.error({ cause: err.cause }, 'Cause');
+      logger.error({ stack: err.stack }, 'Stack trace');
       process.exit(1);
     }
   });
@@ -106,28 +108,28 @@ program
     try {
       const api = await getApi();
       const items = await api.listItems();
-      
+
       const parentId = await resolveDirectory(api, directory);
-      
-      const children = items.filter(item => (item.parent || '') === parentId);
-      
+
+      const children = items.filter((item) => (item.parent || '') === parentId);
+
       if (children.length === 0) {
-        console.log(`No files found in directory: ${directory}`);
+        logger.info(`No files found in directory: ${directory}`);
         await saveCache(api);
         return;
       }
-      
-      console.log(`Contents of ${directory}:`);
+
+      logger.info(`Contents of ${directory}:`);
       for (const child of children) {
         const typeStr = child.type === 'CollectionType' ? '[DIR]' : '[FILE]';
-        console.log(`${typeStr} ${child.visibleName}`);
+        logger.info(`${typeStr} ${child.visibleName}`);
       }
-      
+
       await saveCache(api);
     } catch (err) {
-      console.error('Failed to list files:', err.message);
-      if (err.cause) console.error('Cause:', err.cause);
-      console.error('Stack trace:', err.stack);
+      logger.error({ err }, `Failed to list files: ${err.message}`);
+      if (err.cause) logger.error({ cause: err.cause }, 'Cause');
+      logger.error({ stack: err.stack }, 'Stack trace');
       process.exit(1);
     }
   });
@@ -141,17 +143,17 @@ program
     try {
       const api = await getApi();
       const items = await api.listItems();
-      
-      let children = items.filter(item => (item.parent || '') === parentId);
-      
+
+      let children = items.filter((item) => (item.parent || '') === parentId);
+
       if (options.type) {
-        children = children.filter(item => item.type === options.type);
+        children = children.filter((item) => item.type === options.type);
       }
-      
-      console.log(JSON.stringify(children));
+
+      process.stdout.write(JSON.stringify(children) + '\n');
       await saveCache(api);
     } catch (err) {
-      console.error(JSON.stringify({ error: err.message }));
+      process.stdout.write(JSON.stringify({ error: err.message }) + '\n');
       process.exit(1);
     }
   });
@@ -163,12 +165,12 @@ program
   .action(async (hash) => {
     try {
       const api = await getApi();
-      console.log(`Deleting entry with hash ${hash}...`);
+      logger.info(`Deleting entry with hash ${hash}...`);
       await api.delete(hash);
-      console.log('Delete successful.');
+      logger.info('Delete successful.');
       await saveCache(api);
     } catch (err) {
-      console.error('Failed to delete:', err.message);
+      logger.error({ err }, `Failed to delete: ${err.message}`);
       process.exit(1);
     }
   });
@@ -181,12 +183,12 @@ program
   .action(async (hash, parentId) => {
     try {
       const api = await getApi();
-      console.log(`Moving entry ${hash} to ${parentId}...`);
+      logger.info(`Moving entry ${hash} to ${parentId}...`);
       await api.move(hash, parentId);
-      console.log('Move successful.');
+      logger.info('Move successful.');
       await saveCache(api);
     } catch (err) {
-      console.error('Failed to move:', err.message);
+      logger.error({ err }, `Failed to move: ${err.message}`);
       process.exit(1);
     }
   });
@@ -199,12 +201,12 @@ program
   .action(async (hash, newName) => {
     try {
       const api = await getApi();
-      console.log(`Renaming entry ${hash} to ${newName}...`);
+      logger.info(`Renaming entry ${hash} to ${newName}...`);
       await api.rename(hash, newName);
-      console.log('Rename successful.');
+      logger.info('Rename successful.');
       await saveCache(api);
     } catch (err) {
-      console.error('Failed to rename:', err.message);
+      logger.error({ err }, `Failed to rename: ${err.message}`);
       process.exit(1);
     }
   });
@@ -218,12 +220,12 @@ program
     try {
       const api = await getApi();
       const parentId = await resolveDirectory(api, directory);
-      
+
       const fileBuffer = await fs.readFile(file);
       const ext = path.extname(file).toLowerCase();
       const visibleName = path.basename(file, ext);
-      
-      console.log(`Uploading ${file} to ${directory}...`);
+
+      logger.info(`Uploading ${file} to ${directory}...`);
       if (ext === '.pdf') {
         await api.putPdf(visibleName, fileBuffer, { parent: parentId });
       } else if (ext === '.epub') {
@@ -231,13 +233,13 @@ program
       } else {
         throw new Error('Unsupported file type. Only .pdf and .epub are supported.');
       }
-      
-      console.log('Upload complete!');
+
+      logger.info('Upload complete!');
       await saveCache(api);
     } catch (err) {
-      console.error('Failed to upload file:', err.message);
-      if (err.cause) console.error('Cause:', err.cause);
-      console.error('Stack trace:', err.stack);
+      logger.error({ err }, `Failed to upload file: ${err.message}`);
+      if (err.cause) logger.error({ cause: err.cause }, 'Cause');
+      logger.error({ stack: err.stack }, 'Stack trace');
       process.exit(1);
     }
   });

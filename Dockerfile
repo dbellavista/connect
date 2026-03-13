@@ -35,4 +35,4 @@ COPY . .
 # docker run -i -v $(pwd)/data:/app/data connect-mcp
 
 # The MCP server uses stdio for communication.
-ENTRYPOINT ["node", "mcp-server.js"]
+ENTRYPOINT ["node", "src/mcp-server.js"]

@@ -6,6 +6,27 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "invoke>=2.2.1",
+    "loguru>=0.7.3",
+    "markdown>=3.10.2",
+    "mypy>=1.19.1",
+    "pydantic>=2.12.5",
+    "pymupdf>=1.27.2",
+    "pymupdf4llm>=1.27.2.1",
+    "pytest>=9.0.2",
     "questionary>=2.1.1",
+    "ruff>=0.15.6",
     "ytmusicapi==1.11.5",
 ]
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = false
+warn_unused_configs = true
+disallow_untyped_defs = true
+check_untyped_defs = true
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
